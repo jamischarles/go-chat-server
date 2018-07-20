@@ -1,9 +1,9 @@
 # Go chat server 
 
-Telnet demo:
-![](https://raw.github.com/jamischarles/github-org-browser/master/screenshots/go_server_demo_telnet.gif)
-Curl demo:  
-![](https://raw.github.com/jamischarles/github-org-browser/master/screenshots/go_server_demo_curl.gif)
+**Telnet demo**:
+![](https://raw.github.com/jamischarles/go-chat-server/master/screenshots/go_server_demo_telnet.gif)
+**Curl demo**:  
+![](https://raw.github.com/jamischarles/go-chat-server/master/screenshots/go_server_demo_curl.gif)
 
 ## Start instructions
 ### To run the chat server:
