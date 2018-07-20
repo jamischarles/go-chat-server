@@ -164,12 +164,9 @@ func main() {
 			fmt.Println("Error handling connection:", err.Error())
 			// handle error
 		}
-		fmt.Println("handling connection")
 
-		// connection id
 		id := addNewUser("")
 
-		// queue <- "A new person joined the room"
 		go handleConnection(conn, b, id, cfg)
 	}
 
@@ -211,23 +208,14 @@ func (api *HttpAPI) httpPosthandler(w http.ResponseWriter, r *http.Request) {
 func clientFunc(id int, b *Broker, conn net.Conn) {
 	msgCh := b.Subscribe()
 	for {
-		// var msg string
 		// FIXME: can we change the return type to a ChatMessage instead of interface?
 		msgData := <-msgCh
 		msgDetails := msgData.(ChatMessage)
 
-		fmt.Println("id", id)
-		fmt.Println("msgDetails.id", msgDetails.id)
-
 		// don't write message from self, or if author was muted
-		result := isMessageAuthorMuted(id, msgDetails.id)
-		fmt.Println("result", result)
-
 		if id != msgDetails.id && isMessageAuthorMuted(id, msgDetails.id) == false {
 			conn.Write([]byte(msgDetails.msg))
 		}
-
-		// don't write message if msg author is on your muteList
 
 	}
 }
@@ -235,10 +223,12 @@ func clientFunc(id int, b *Broker, conn net.Conn) {
 // FIXME: make config global?
 func handleConnection(conn net.Conn, b *Broker, id int, cfg Config) {
 	remoteAddr := conn.RemoteAddr().String()
-	// FIXME: use substitution here
-	fmt.Printf("Client id: %d connected from "+remoteAddr, id)
+	fmt.Printf("Client id: %d with username [%s] connected from %s\n", id, getUserName(id), remoteAddr)
 
-	printWelcomeMessage(conn)
+	msg := fmt.Sprintf("%s has joined", getUserName(id))
+	sendMessage(msg, 0, b, cfg)
+
+	printWelcomeMessage(conn, id)
 
 	// since we are turning this into a goroutine, it's kind of the same as non-blocking async stuff in node
 	go clientFunc(id, b, conn)
@@ -285,8 +275,8 @@ func getTimeStamp() (timestamp string) {
 	return timestamp
 }
 
-func printWelcomeMessage(conn net.Conn) {
-	conn.Write([]byte("> Welcome to the chat room. Type /help for a list of available commands.\n"))
+func printWelcomeMessage(conn net.Conn, id int) {
+	conn.Write([]byte("> Welcome to the chat room. Type /help for a list of available commands.\n> Your username is [" + getUserName(id) + "]\n"))
 }
 
 func changeUserName(id int, newName string) {
@@ -314,7 +304,6 @@ func isMessageAuthorMuted(userIdRequestingMute int, messageAuthorId int) bool {
 		return true
 	}
 
-	fmt.Println("NO MATCH")
 	return false
 
 }
@@ -398,6 +387,9 @@ func formatMessage(msg string, id int) string {
 // format and send message to all connected clients
 // sends messages to all the connected clients
 func sendMessage(msg string, id int, b *Broker, cfg Config) {
+	if msg == "" {
+		return
+	}
 	msg = formatMessage(msg, id)
 	msgData := ChatMessage{msg: msg, id: id}
 	b.Publish(msgData)   // send to all users
@@ -434,14 +426,14 @@ func handleCommand(message string, conn net.Conn, id int, b *Broker, cfg Config)
 
 		case message == "/help":
 
-			msg := `Commands you can run:
-	/help - See commands available to you
-	/name - Change your username
-	/mute [name] - mute another user
-	/unmute [name] - unmute a user you have muted previously
-	/quit - disconnect your client
-			`
-			msg = formatMessage(msg, 0) // system msg to 1 person only
+			msg := `> Commands you can run:
+/help - See commands available to you
+/history - See the last 30 messages
+/name - Change your username
+/mute [name] - mute another user
+/unmute [name] - unmute a user you have muted previously
+/quit - disconnect your client` + "\n"
+			// msg = formatMessage(msg, 0)
 			conn.Write([]byte(msg))
 
 		case message == "/history":
@@ -503,8 +495,9 @@ func handleCommand(message string, conn net.Conn, id int, b *Broker, cfg Config)
 
 		case message == "/quit":
 			fmt.Println("Quitting.")
-			conn.Write([]byte("> Goodbye"))
-			fmt.Println("< " + "%quit%")
+			msg := fmt.Sprintf("%s has left", getUserName(id))
+			sendMessage(msg, 0, b, cfg)
+			conn.Write([]byte("> Goodbye\n"))
 			conn.Close()
 
 		default:
